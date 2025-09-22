@@ -2,10 +2,11 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loginWithInstagram, exchangeCodeForToken } from '../auth/instagram';
 import { useAuth } from '../auth/AuthContext';
+import { LocalStore } from '../services/localStore';
 
 /**
  * PUBLIC_INTERFACE
- * Signup page for creating an account (demo) or using Instagram OAuth.
+ * Signup page for creating an account using local JSON persistence or Instagram OAuth.
  * Redirects to target route after successful auth.
  */
 export default function Signup() {
@@ -36,14 +37,22 @@ export default function Signup() {
     setErr('');
     setLoading(true);
     try {
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
       if (!email || !password || !confirm) throw new Error('Please fill out all fields.');
       if (!/.+@.+\..+/.test(email)) throw new Error('Please enter a valid email.');
       if (password.length < 6) throw new Error('Password must be at least 6 characters.');
       if (password !== confirm) throw new Error('Passwords do not match.');
-      // Demo: set token
-      setToken('demo_signup_token');
-      setUser({ name: email.split('@')[0], email, provider: 'local' });
+
+      // Persist user to LocalStore (throws if email exists)
+      const created = LocalStore.addUser({ email, password, name: email.split('@')[0] });
+
+      // Create session
+      const mockToken = `token_${created.id}_${Date.now()}`;
+      LocalStore.saveSession({ token: mockToken, userId: created.id });
+
+      // Update auth context
+      setToken(mockToken);
+      setUser({ name: created.name, email: created.email, provider: 'local' });
       navigate(redirectTarget, { replace: true });
     } catch (e) {
       setErr(e.message || 'Signup failed.');
@@ -66,11 +75,25 @@ export default function Signup() {
         setErr('');
         try {
           const res = await exchangeCodeForToken(code);
-          setToken(res.access_token);
+          const tokenVal = res.access_token;
+          const email = `${(res.user?.username || 'instagram_user')}@instagram.local`;
+          let localUser = LocalStore.getUserByEmail(email);
+          if (!localUser) {
+            try {
+              localUser = LocalStore.addUser({ email, password: 'oauth/instagram', name: res.user?.username || 'Instagram Creator' });
+            } catch {
+              localUser = LocalStore.getUserByEmail(email);
+            }
+          }
+          if (localUser) {
+            LocalStore.saveSession({ token: tokenVal, userId: localUser.id });
+          }
+          setToken(tokenVal);
           setUser({
             name: res.user?.username || 'Instagram Creator',
             avatar: res.user?.profile_picture || '',
             provider: 'instagram',
+            email
           });
           navigate(redirectTarget, { replace: true });
         } catch (e) {

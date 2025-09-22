@@ -1,3 +1,5 @@
+import { LocalStore } from '../services/localStore';
+
 const CLIENT_ID = process.env.REACT_APP_INSTAGRAM_CLIENT_ID;
 const REDIRECT_URI = process.env.REACT_APP_INSTAGRAM_REDIRECT_URI;
 // NOTE: REACT_APP_INSTAGRAM_CLIENT_SECRET must NOT be used on the client for security.
@@ -57,6 +59,7 @@ export async function exchangeCodeForToken(code) {
 // PUBLIC_INTERFACE
 export function logout() {
   /** Clears auth state on client; server session revocation would occur on backend. */
-  sessionStorage.removeItem('auth_token');
-  sessionStorage.removeItem('auth_user');
+  sessionStorage.removeItem('auth_token'); // legacy
+  sessionStorage.removeItem('auth_user');  // legacy
+  LocalStore.clearSession();
 }

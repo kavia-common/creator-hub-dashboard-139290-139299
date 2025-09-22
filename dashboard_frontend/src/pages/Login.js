@@ -2,11 +2,12 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { loginWithInstagram, exchangeCodeForToken } from '../auth/instagram';
 import { useAuth } from '../auth/AuthContext';
+import { LocalStore } from '../services/localStore';
 
 /**
  * PUBLIC_INTERFACE
- * Login page for user authentication with email/password (demo) and Instagram OAuth.
- * Redirects to target route after successful auth.
+ * Login page for user authentication with email/password using local JSON persistence,
+ * and Instagram OAuth. Redirects to target route after successful auth.
  */
 export default function Login() {
   const { token, setToken, setUser } = useAuth();
@@ -36,14 +37,21 @@ export default function Login() {
     setErr('');
     setLoading(true);
     try {
-      // Demo: accept any non-empty email/password
-      await new Promise(r => setTimeout(r, 500));
+      await new Promise(r => setTimeout(r, 300));
       if (!email || !password) throw new Error('Please enter email and password.');
-      // naive validation
       if (!/.+@.+\..+/.test(email)) throw new Error('Please enter a valid email.');
-      // Set a demo token & user
-      setToken('demo_email_token');
-      setUser({ name: email.split('@')[0], email, provider: 'local' });
+
+      const user = LocalStore.validateCredentials(email, password);
+      if (!user) {
+        throw new Error('Invalid email or password.');
+      }
+
+      // Create and persist session
+      const mockToken = `token_${user.id}_${Date.now()}`;
+      LocalStore.saveSession({ token: mockToken, userId: user.id });
+
+      setToken(mockToken);
+      setUser({ name: user.name, email: user.email, provider: 'local' });
       navigate(redirectTarget, { replace: true });
     } catch (e) {
       setErr(e.message || 'Login failed.');
@@ -56,7 +64,7 @@ export default function Login() {
     loginWithInstagram();
   }
 
-  // Optionally handle oauth code here if the redirect_uri points back to this page
+  // Handle oauth code if the redirect_uri points back to this page
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
@@ -67,13 +75,27 @@ export default function Login() {
         setErr('');
         try {
           const res = await exchangeCodeForToken(code);
-          setToken(res.access_token);
+          const tokenVal = res.access_token;
+          // Attempt to locate or create a local user for OAuth
+          const email = `${(res.user?.username || 'instagram_user')}@instagram.local`;
+          let localUser = LocalStore.getUserByEmail(email);
+          if (!localUser) {
+            try {
+              localUser = LocalStore.addUser({ email, password: 'oauth/instagram', name: res.user?.username || 'Instagram Creator' });
+            } catch {
+              localUser = LocalStore.getUserByEmail(email);
+            }
+          }
+          if (localUser) {
+            LocalStore.saveSession({ token: tokenVal, userId: localUser.id });
+          }
+          setToken(tokenVal);
           setUser({
             name: res.user?.username || 'Instagram Creator',
             avatar: res.user?.profile_picture || '',
             provider: 'instagram',
+            email
           });
-          // Clear code params and redirect
           navigate(redirectTarget, { replace: true });
         } catch (e) {
           console.error(e);

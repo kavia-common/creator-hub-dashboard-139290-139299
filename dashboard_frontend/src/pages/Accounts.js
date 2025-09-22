@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Api } from '../services/api';
 import { loginWithInstagram } from '../auth/instagram';
+import { useAuth } from '../auth/AuthContext';
+import { LocalStore } from '../services/localStore';
 
 /**
  * PUBLIC_INTERFACE
@@ -8,9 +10,37 @@ import { loginWithInstagram } from '../auth/instagram';
  */
 export default function Accounts({ onLinkAccount }) {
   const [accounts, setAccounts] = useState([]);
+  const { user } = useAuth();
 
   useEffect(() => {
-    Api.getAccounts().then(setAccounts).catch(() => setAccounts([]));
+    // Prefer localStore accounts for the current user; fallback to API mock else.
+    const load = async () => {
+      const current = LocalStore.getCurrentUser();
+      if (current) {
+        const accs = LocalStore.getAccountsForUser(current.id);
+        if (accs.length > 0) {
+          setAccounts(accs);
+          return;
+        }
+        // If none exist, create a demo connected Instagram account for the user once
+        const demo = LocalStore.addAccount({
+          userId: current.id,
+          provider: 'instagram',
+          handle: `@${(user?.name || current.name || 'demo').replace(/\s+/g, '').toLowerCase()}`,
+          status: 'Connected'
+        });
+        setAccounts([demo]);
+        return;
+      }
+      try {
+        const fromApi = await Api.getAccounts();
+        setAccounts(fromApi);
+      } catch {
+        setAccounts([]);
+      }
+    };
+    load();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   return (
