@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
 import { loginWithInstagram, exchangeCodeForToken, logout } from './auth/instagram';
@@ -9,24 +9,26 @@ import Posts from './pages/Posts';
 import Audience from './pages/Audience';
 import Accounts from './pages/Accounts';
 import Settings from './pages/Settings';
+import Login from './pages/Login';
+import Signup from './pages/Signup';
 import PublishModal from './components/PublishModal';
 import LinkAccountModal from './components/LinkAccountModal';
+import AuthGuard from './auth/AuthGuard';
 
 // App Shell
 
 function AppShell() {
-  const { user, token, setToken, setUser } = useAuth();
+  const { token, setToken, setUser } = useAuth();
   const [showPublish, setShowPublish] = useState(false);
   const [showLinkAccount, setShowLinkAccount] = useState(false);
   const navigate = useNavigate();
   const location = useLocation();
 
-  // Handle OAuth callback
+  // Handle OAuth callback (if redirected here)
   useEffect(() => {
     const params = new URLSearchParams(location.search);
     const code = params.get('code');
     const provider = params.get('provider');
-    const state = params.get('state');
 
     async function handleOAuth() {
       if (code && provider === 'instagram') {
@@ -38,11 +40,12 @@ function AppShell() {
             avatar: res.user?.profile_picture || '',
             provider: 'instagram',
           });
-          // Clear query params
-          navigate('/', { replace: true });
+          // Determine redirect target if provided
+          const redirect = params.get('redirect') || '/';
+          navigate(redirect, { replace: true });
         } catch (e) {
           console.error('OAuth exchange failed', e);
-          navigate('/', { replace: true });
+          navigate('/login', { replace: true });
         }
       }
     }
@@ -81,9 +84,9 @@ function AppShell() {
         </nav>
         <div style={{ marginTop: 'auto', display: 'grid', gap: 8 }}>
           {!token ? (
-            <button className="btn btn-primary" onClick={() => loginWithInstagram()}>
-              <span>📷</span> Connect Instagram
-            </button>
+            <NavLink to="/login" className="btn btn-primary" style={{ textAlign: 'center' }}>
+              <span>🔐</span> Sign in
+            </NavLink>
           ) : (
             <>
               <button className="btn btn-outline" onClick={() => setShowLinkAccount(true)}>
@@ -117,11 +120,53 @@ function AppShell() {
 
       <main className="content">
         <Routes>
-          <Route path="/" element={<Dashboard onQuickPublish={() => setShowPublish(true)} />} />
-          <Route path="/posts" element={<Posts />} />
-          <Route path="/audience" element={<Audience />} />
-          <Route path="/accounts" element={<Accounts onLinkAccount={() => setShowLinkAccount(true)} />} />
-          <Route path="/settings" element={<Settings />} />
+          {/* Public routes */}
+          <Route path="/login" element={<Login />} />
+          <Route path="/signup" element={<Signup />} />
+
+          {/* Private (guarded) routes */}
+          <Route
+            path="/"
+            element={(
+              <AuthGuard>
+                <Dashboard onQuickPublish={() => setShowPublish(true)} />
+              </AuthGuard>
+            )}
+          />
+          <Route
+            path="/posts"
+            element={(
+              <AuthGuard>
+                <Posts />
+              </AuthGuard>
+            )}
+          />
+          <Route
+            path="/audience"
+            element={(
+              <AuthGuard>
+                <Audience />
+              </AuthGuard>
+            )}
+          />
+          <Route
+            path="/accounts"
+            element={(
+              <AuthGuard>
+                <Accounts onLinkAccount={() => setShowLinkAccount(true)} />
+              </AuthGuard>
+            )}
+          />
+          <Route
+            path="/settings"
+            element={(
+              <AuthGuard>
+                <Settings />
+              </AuthGuard>
+            )}
+          />
+          {/* Fallback */}
+          <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </main>
 
