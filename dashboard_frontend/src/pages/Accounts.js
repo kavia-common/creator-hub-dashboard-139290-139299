@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from 'react';
 import { Api } from '../services/api';
-import { loginWithInstagram } from '../auth/instagram';
 import { useAuth } from '../auth/AuthContext';
 import { LocalStore } from '../services/localStore';
 
@@ -22,10 +21,10 @@ export default function Accounts({ onLinkAccount }) {
           setAccounts(accs);
           return;
         }
-        // If none exist, create a demo connected Instagram account for the user once
+        // If none exist, create a demo connected account for the user once
         const demo = LocalStore.addAccount({
           userId: current.id,
-          provider: 'instagram',
+          provider: 'local',
           handle: `@${(user?.name || current.name || 'demo').replace(/\s+/g, '').toLowerCase()}`,
           status: 'Connected'
         });
@@ -50,7 +49,6 @@ export default function Accounts({ onLinkAccount }) {
           <h3>Connected Accounts</h3>
           <div className="row" style={{ gap: 10 }}>
             <button className="btn btn-outline" onClick={onLinkAccount}>Link Account</button>
-            <button className="btn btn-primary" onClick={loginWithInstagram}><span>📷</span>Connect Instagram</button>
           </div>
         </div>
         <table className="table">

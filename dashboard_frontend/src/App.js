@@ -1,9 +1,7 @@
-import React, { useEffect, useMemo, useState } from 'react';
-import { BrowserRouter, Routes, Route, NavLink, useNavigate, useLocation, Navigate } from 'react-router-dom';
+import React, { useMemo, useState } from 'react';
+import { BrowserRouter, Routes, Route, NavLink, Navigate } from 'react-router-dom';
 import './App.css';
 import { AuthProvider, useAuth } from './auth/AuthContext';
-import { loginWithInstagram, exchangeCodeForToken, logout } from './auth/instagram';
-import { Api } from './services/api';
 import Dashboard from './pages/Dashboard';
 import Posts from './pages/Posts';
 import Audience from './pages/Audience';
@@ -21,37 +19,6 @@ function AppShell() {
   const { token, setToken, setUser } = useAuth();
   const [showPublish, setShowPublish] = useState(false);
   const [showLinkAccount, setShowLinkAccount] = useState(false);
-  const navigate = useNavigate();
-  const location = useLocation();
-
-  // Handle OAuth callback (if redirected here)
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const code = params.get('code');
-    const provider = params.get('provider');
-
-    async function handleOAuth() {
-      if (code && provider === 'instagram') {
-        try {
-          const res = await exchangeCodeForToken(code);
-          setToken(res.access_token);
-          setUser({
-            name: res.user?.username || 'Instagram Creator',
-            avatar: res.user?.profile_picture || '',
-            provider: 'instagram',
-          });
-          // Determine redirect target if provided
-          const redirect = params.get('redirect') || '/';
-          navigate(redirect, { replace: true });
-        } catch (e) {
-          console.error('OAuth exchange failed', e);
-          navigate('/login', { replace: true });
-        }
-      }
-    }
-    handleOAuth();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [location.search]);
 
   const navItems = useMemo(() => ([
     { to: '/', label: 'Dashboard', icon: '📊' },
@@ -62,9 +29,15 @@ function AppShell() {
   ]), []);
 
   const onLogout = () => {
-    logout();
+    // Clear local session only (no OAuth)
     setToken(null);
     setUser(null);
+    try {
+      sessionStorage.removeItem('auth_token');
+      sessionStorage.removeItem('auth_user');
+    } catch {
+      // ignore
+    }
   };
 
   return (
@@ -99,9 +72,7 @@ function AppShell() {
           )}
           <div className="separator" />
           <div style={{ fontSize: 12, color: '#6b7280' }}>
-            OAuth via Instagram. Ensure env vars are set in .env:
-            <div>REACT_APP_INSTAGRAM_CLIENT_ID</div>
-            <div>REACT_APP_INSTAGRAM_REDIRECT_URI</div>
+            Tip: Use the Sign in button above to access your dashboard.
           </div>
         </div>
       </aside>
@@ -199,7 +170,7 @@ function UserBadge() {
 function App() {
   /**
    * Root application component that wires routing, auth context, and layout.
-   * Implements Instagram OAuth, sidebar layout, top action bar, and modals.
+   * Uses email/password authentication only.
    */
   return (
     <AuthProvider>

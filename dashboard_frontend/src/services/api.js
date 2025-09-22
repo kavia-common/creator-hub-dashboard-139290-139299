@@ -46,7 +46,7 @@ export const Api = {
       return await request('/api/accounts', { method: 'GET' });
     } catch {
       return [
-        { id: 'ig-1', provider: 'instagram', handle: '@demo.creator', status: 'Connected' }
+        { id: 'acc-1', provider: 'local', handle: '@demo.creator', status: 'Connected' }
       ];
     }
   },

@@ -1,12 +1,11 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
-import { loginWithInstagram, exchangeCodeForToken } from '../auth/instagram';
 import { useAuth } from '../auth/AuthContext';
 import { LocalStore } from '../services/localStore';
 
 /**
  * PUBLIC_INTERFACE
- * Signup page for creating an account using local JSON persistence or Instagram OAuth.
+ * Signup page for creating an account using local JSON persistence.
  * Redirects to target route after successful auth.
  */
 export default function Signup() {
@@ -61,52 +60,6 @@ export default function Signup() {
     }
   }
 
-  async function handleInstagramLogin() {
-    loginWithInstagram();
-  }
-
-  useEffect(() => {
-    const params = new URLSearchParams(location.search);
-    const code = params.get('code');
-    const provider = params.get('provider');
-    if (code && provider === 'instagram') {
-      (async () => {
-        setLoading(true);
-        setErr('');
-        try {
-          const res = await exchangeCodeForToken(code);
-          const tokenVal = res.access_token;
-          const email = `${(res.user?.username || 'instagram_user')}@instagram.local`;
-          let localUser = LocalStore.getUserByEmail(email);
-          if (!localUser) {
-            try {
-              localUser = LocalStore.addUser({ email, password: 'oauth/instagram', name: res.user?.username || 'Instagram Creator' });
-            } catch {
-              localUser = LocalStore.getUserByEmail(email);
-            }
-          }
-          if (localUser) {
-            LocalStore.saveSession({ token: tokenVal, userId: localUser.id });
-          }
-          setToken(tokenVal);
-          setUser({
-            name: res.user?.username || 'Instagram Creator',
-            avatar: res.user?.profile_picture || '',
-            provider: 'instagram',
-            email
-          });
-          navigate(redirectTarget, { replace: true });
-        } catch (e) {
-          console.error(e);
-          setErr('Instagram authentication failed. Please try again.');
-        } finally {
-          setLoading(false);
-        }
-      })();
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
   return (
     <div style={styles.page}>
       <div style={styles.card}>
@@ -158,17 +111,7 @@ export default function Signup() {
           </button>
         </form>
 
-        <div style={styles.divider}>
-          <span style={styles.dividerLine} />
-          <span style={styles.dividerText}>or</span>
-          <span style={styles.dividerLine} />
-        </div>
-
-        <button className="btn btn-outline" onClick={handleInstagramLogin} disabled={loading}>
-          <span>📷</span> Continue with Instagram
-        </button>
-
-        <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12 }}>
+        <div style={{ fontSize: 14, color: '#6b7280', marginTop: 12, textAlign: 'center' }}>
           Already have an account?{' '}
           <Link to={`/login?redirect=${encodeURIComponent(redirectTarget)}`} style={{ color: 'var(--primary)', fontWeight: 600 }}>
             Sign in
@@ -229,21 +172,6 @@ const styles = {
     fontSize: 12,
     color: '#6b7280',
     marginBottom: 6
-  },
-  divider: {
-    display: 'grid',
-    gridTemplateColumns: '1fr auto 1fr',
-    gap: 10,
-    alignItems: 'center',
-    margin: '8px 0'
-  },
-  dividerLine: {
-    height: 1,
-    background: 'var(--border)'
-  },
-  dividerText: {
-    fontSize: 12,
-    color: '#6b7280'
   },
   error: {
     background: '#FEF2F2',

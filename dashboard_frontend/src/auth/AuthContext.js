@@ -17,6 +17,7 @@ export function AuthProvider({ children }) {
   /**
    * Auth context provider that persists session to localStorage (via LocalStore),
    * while maintaining backward compatibility with existing sessionStorage keys.
+   * OAuth/social flows are disabled in this build; only local email/password is supported.
    */
   const [token, setTokenState] = useState(null);
   const [user, setUser] = useState(null);
@@ -76,12 +77,12 @@ export function AuthProvider({ children }) {
   const setUserPersist = (u) => {
     setUser(u);
     if (u && token) {
-      // Find or create a local user record and save session
+      // Ensure a local user exists and save session (local-only auth)
       const email = u.email || `${(u.name || 'user').toLowerCase()}@example.com`;
       let localUser = LocalStore.getUserByEmail(email);
       if (!localUser) {
         try {
-          localUser = LocalStore.addUser({ email, password: 'oauth/local', name: u.name || email.split('@')[0] });
+          localUser = LocalStore.addUser({ email, password: 'local/generated', name: u.name || email.split('@')[0] });
         } catch {
           localUser = LocalStore.getUserByEmail(email);
         }
